@@ -1,0 +1,184 @@
+# ETH Trading Bot Configuration
+
+server:
+  port: 8080
+  mode: "development"  # development | production
+  read_timeout: 30     # seconds
+  write_timeout: 30    # seconds
+
+trading:
+  mode: "paper"                              # paper | live
+  symbol: "ETHUSDT"
+  timeframes: ["1m", "5m", "15m", "1h", "4h", "1d"]
+  primary_timeframe: "1m"  # Changed to 1m for faster signal generation
+  paper_balance: 100000.0                    # $100,000 default for paper trading
+
+binance:
+  api_key: "${BINANCE_API_KEY}"
+  api_secret: "${BINANCE_API_SECRET}"
+  testnet: true                              # Use testnet for development
+  base_url: "https://testnet.binance.vision/api"
+  ws_url: "wss://testnet.binance.vision/ws"
+  # Production URLs (uncomment for live trading):
+  # base_url: "https://api.binance.com/api"
+  # ws_url: "wss://stream.binance.com:9443/ws"
+
+database:
+  path: "./data/trading.db"
+  journal_mode: "WAL"
+  synchronous: "NORMAL"
+  persist_interval: 10                       # seconds between batch writes
+  candle_retention_days: 365                 # how long to keep historical candles
+
+candle_queues:
+  capacities:
+    "1m": 500                                # ~8 hours of 1m candles
+    "5m": 300                                # ~25 hours of 5m candles
+    "15m": 200                               # ~50 hours of 15m candles
+    "1h": 200                                # ~8 days of 1h candles
+    "4h": 150                                # ~25 days of 4h candles
+    "1d": 100                                # ~100 days of daily candles
+  default_capacity: 200
+
+indicators:
+  rsi:
+    period: 14
+    overbought: 70
+    oversold: 30
+    extreme_overbought: 80
+    extreme_oversold: 20
+  adx:
+    period: 14
+    trend_threshold: 25
+    strong_trend_threshold: 30
+  bollinger:
+    period: 20
+    std_dev: 2.0
+  atr:
+    period: 14
+  macd:
+    fast_period: 12
+    slow_period: 26
+    signal_period: 9
+  moving_averages:
+    fast: 10
+    slow: 50
+    trend: 200
+
+strategies:
+  trend:
+    enabled: true
+    weight: 0.30
+    params:
+      adx_threshold: 25
+      ma_fast: 10
+      ma_slow: 50
+      volume_confirmation: true
+  mean_reversion:
+    enabled: true
+    weight: 0.25
+    params:
+      rsi_oversold: 30
+      rsi_overbought: 70
+      bb_threshold: 2.0
+      max_hold_periods: 20
+  breakout:
+    enabled: true
+    weight: 0.20
+    params:
+      lookback_period: 20
+      atr_multiplier: 1.5
+      volume_spike_threshold: 2.0
+      confirmation_candles: 1
+  volatility:
+    enabled: true
+    weight: 0.15
+    params:
+      squeeze_percentile: 10
+      expansion_threshold: 1.2
+  stat_arb:
+    enabled: false                           # Disabled by default - requires ETH/BTC pair
+    weight: 0.10
+    params:
+      z_score_entry: 2.0
+      z_score_exit: 0.5
+      lookback_period: 50
+
+risk:
+  # Position Sizing
+  max_position_size_percent: 0.10            # 10% of account max per position
+  risk_per_trade_percent: 0.01               # 1% risk per trade
+  max_open_positions: 3
+
+  # Stop Loss Settings
+  stop_loss:
+    type: "atr"                              # fixed | atr | percentage | trailing
+    atr_multiple: 2.0
+    percent: 0.02                            # 2% fallback
+    trailing_atr: 1.5
+    time_limit: 100                          # max bars to hold position
+
+  # Take Profit Settings
+  take_profit:
+    enabled: true
+    atr_multiple: 3.0
+    scale_out: true
+    targets:
+      - percent: 0.33
+        risk_multiple: 1.0
+      - percent: 0.33
+        risk_multiple: 2.0
+      - percent: 0.34
+        risk_multiple: 3.0
+
+  # Drawdown Protection
+  drawdown:
+    max_daily: 0.03                          # 3% max daily loss
+    max_weekly: 0.07                         # 7% max weekly loss
+    max_total: 0.15                          # 15% max total drawdown
+    reduce_size_threshold: 0.75              # Reduce size at 75% of limit
+
+  # Circuit Breaker
+  circuit_breaker:
+    max_consecutive_losses: 5
+    max_losses_per_hour: 3
+    max_losses_per_day: 7
+    volatility_pause_threshold: 3.0          # Pause if ATR > 3x average
+
+  # Exposure Limits
+  exposure:
+    max_long: 0.50                           # 50% max long exposure
+    max_short: 0.30                          # 30% max short exposure
+    max_total: 0.60                          # 60% max total exposure
+
+execution:
+  slippage: 0.001                            # 0.1% slippage assumption
+  commission: 0.001                          # 0.1% commission (Binance spot)
+
+backtest:
+  default_initial_balance: 100000.0
+  default_commission: 0.001
+  default_slippage: 0.001
+
+alerts:
+  enabled: false
+  telegram:
+    enabled: false
+    bot_token: "${TELEGRAM_BOT_TOKEN}"
+    chat_id: "${TELEGRAM_CHAT_ID}"
+  discord:
+    enabled: false
+    webhook_url: "${DISCORD_WEBHOOK_URL}"
+  thresholds:
+    drawdown_warning: 0.05                   # Alert at 5% drawdown
+    profit_notification: 0.02                # Alert at 2% profit
+    volatility_spike: 2.0                    # Alert if ATR > 2x average
+
+logging:
+  level: "info"                              # debug | info | warn | error
+  format: "json"                             # json | text
+  output: "stdout"                           # stdout | file
+  file: "logs/trading.log"
+  max_size: 100                              # MB
+  max_backups: 5
+  max_age: 30                                # days

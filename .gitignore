@@ -1,0 +1,80 @@
+# Binaries
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary
+*.test
+
+# Output of go coverage tool
+*.out
+coverage.html
+
+# Dependency directories
+vendor/
+
+# Go workspace file
+go.work
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Database
+data/*.db
+data/*.db-wal
+data/*.db-shm
+
+# Logs
+logs/
+*.log
+
+# Node modules (frontend)
+web/node_modules/
+web/dist/
+web/.cache/
+
+# Build artifacts
+build/
+dist/
+
+# Temporary files
+tmp/
+temp/
+
+# Secrets
+*.pem
+*.key
+credentials.json
+secrets.yaml
+
+# Backtest results (can be large)
+backtest_results/
+
+# Air (hot reload)
+tmp/
+
+# Coverage
+coverage/
+
+
+## AI ignore
+.playwright-mcp
+
+.claude
+.env
