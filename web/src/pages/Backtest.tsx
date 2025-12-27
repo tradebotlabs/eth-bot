@@ -28,30 +28,6 @@ function useIsMobile() {
   return isMobile;
 }
 
-// Generate mock monthly returns data
-const generateMonthlyReturns = () => {
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  return months.map(month => ({
-    month,
-    return: (Math.random() - 0.4) * 20,
-  }));
-};
-
-// Generate mock trade distribution
-const generateTradeDistribution = () => {
-  const ranges = [
-    { range: '-5%+', count: Math.floor(Math.random() * 5) },
-    { range: '-3 to -5%', count: Math.floor(Math.random() * 10) },
-    { range: '-1 to -3%', count: Math.floor(Math.random() * 20) },
-    { range: '0 to -1%', count: Math.floor(Math.random() * 25) },
-    { range: '0 to 1%', count: Math.floor(Math.random() * 30) },
-    { range: '1 to 3%', count: Math.floor(Math.random() * 25) },
-    { range: '3 to 5%', count: Math.floor(Math.random() * 15) },
-    { range: '5%+', count: Math.floor(Math.random() * 8) },
-  ];
-  return ranges;
-};
-
 export function Backtest() {
   const queryClient = useQueryClient();
   const [selectedResult, setSelectedResult] = useState<BacktestResult | null>(null);
@@ -93,9 +69,37 @@ export function Backtest() {
     },
   });
 
-  // Generate chart data for selected result
-  const monthlyReturns = useMemo(() => generateMonthlyReturns(), [selectedResult]);
-  const tradeDistribution = useMemo(() => generateTradeDistribution(), [selectedResult]);
+  // Map chart data for selected result
+  const monthlyReturns = useMemo(() => {
+    if (!selectedResult?.monthlyReturns) return [];
+    return Object.entries(selectedResult.monthlyReturns).map(([month, ret]) => ({
+      month,
+      return: ret * 100, // percentage
+    }));
+  }, [selectedResult]);
+
+  const tradeDistribution = useMemo(() => {
+    if (!selectedResult?.trades) return [];
+
+    const ranges = [
+      { range: '-5%+', count: 0, min: -Infinity, max: -0.05 },
+      { range: '-3 to -5%', count: 0, min: -0.05, max: -0.03 },
+      { range: '-1 to -3%', count: 0, min: -0.03, max: -0.01 },
+      { range: '0 to -1%', count: 0, min: -0.01, max: 0 },
+      { range: '0 to 1%', count: 0, min: 0, max: 0.01 },
+      { range: '1 to 3%', count: 0, min: 0.01, max: 0.03 },
+      { range: '3 to 5%', count: 0, min: 0.03, max: 0.05 },
+      { range: '5%+', count: 0, min: 0.05, max: Infinity },
+    ];
+
+    selectedResult.trades.forEach(trade => {
+      const pnlPct = trade.pnlPercent;
+      const range = ranges.find(r => pnlPct > r.min && pnlPct <= r.max);
+      if (range) range.count++;
+    });
+
+    return ranges;
+  }, [selectedResult]);
 
   const runMutation = useMutation({
     mutationFn: (cfg: BacktestConfig) => api.runBacktest(cfg),
@@ -453,10 +457,9 @@ export function Backtest() {
                       <span style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '14px' }}>
                         {result.config.strategies.join(', ').substring(0, 20)}{result.config.strategies.join(', ').length > 20 ? '...' : ''}
                       </span>
-                      <span className={`badge ${
-                        result.status === 'completed' ? 'badge-success' :
+                      <span className={`badge ${result.status === 'completed' ? 'badge-success' :
                         result.status === 'failed' ? 'badge-danger' : 'badge-warning'
-                      }`}>
+                        }`}>
                         {result.status}
                       </span>
                     </div>
@@ -602,8 +605,8 @@ export function Backtest() {
                       <AreaChart data={selectedResult.equityCurve}>
                         <defs>
                           <linearGradient id="equityGradient" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#26a69a" stopOpacity={0.3}/>
-                            <stop offset="95%" stopColor="#26a69a" stopOpacity={0}/>
+                            <stop offset="5%" stopColor="#26a69a" stopOpacity={0.3} />
+                            <stop offset="95%" stopColor="#26a69a" stopOpacity={0} />
                           </linearGradient>
                         </defs>
                         <CartesianGrid strokeDasharray="3 3" stroke="#2a2e39" vertical={false} />
@@ -704,11 +707,11 @@ export function Backtest() {
                   </div>
                   <div style={{ padding: isMobile ? '12px' : '16px', height: isMobile ? '180px' : '200px' }}>
                     <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={selectedResult.drawdownCurve}>
+                      <AreaChart data={selectedResult.equityCurve}>
                         <defs>
                           <linearGradient id="ddGradient" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#ef5350" stopOpacity={0.4}/>
-                            <stop offset="95%" stopColor="#ef5350" stopOpacity={0}/>
+                            <stop offset="5%" stopColor="#ef5350" stopOpacity={0.4} />
+                            <stop offset="95%" stopColor="#ef5350" stopOpacity={0} />
                           </linearGradient>
                         </defs>
                         <CartesianGrid strokeDasharray="3 3" stroke="#2a2e39" vertical={false} />

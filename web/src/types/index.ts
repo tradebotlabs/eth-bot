@@ -188,13 +188,22 @@ export interface BacktestResult {
     calmarRatio: number;
   };
   trades: Trade[];
-  equityCurve: { time: number; equity: number }[];
-  drawdownCurve: { time: number; drawdown: number }[];
+  equityCurve: { time: string; equity: number; drawdown: number; return: number }[];
+  monthlyReturns?: Record<string, number>;
+  strategyStats?: Record<string, {
+    name: string;
+    totalTrades: number;
+    winRate: number;
+    profitFactor: number;
+    netProfit: number;
+    contribution: number;
+  }>;
   status: 'pending' | 'running' | 'completed' | 'failed';
   progress: number;
   error?: string;
   startTime: string;
   endTime?: string;
+  executionTime?: string;
 }
 
 export interface WSMessage {

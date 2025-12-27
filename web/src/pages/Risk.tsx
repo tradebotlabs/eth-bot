@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
   AreaChart,
   Area,
@@ -29,48 +29,6 @@ function useIsMobile() {
   return isMobile;
 }
 
-// Generate mock drawdown history data
-const generateDrawdownHistory = (days: number = 30) => {
-  const data = [];
-  let peak = 100000;
-  let equity = 100000;
-
-  for (let i = 0; i < days; i++) {
-    const date = new Date();
-    date.setDate(date.getDate() - (days - i));
-
-    // Random equity changes
-    equity += (Math.random() - 0.48) * 2000;
-    equity = Math.max(equity, 80000);
-
-    if (equity > peak) peak = equity;
-    const drawdown = ((peak - equity) / peak) * 100;
-
-    data.push({
-      date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-      equity: Math.round(equity),
-      drawdown: parseFloat(drawdown.toFixed(2)),
-      peak: Math.round(peak),
-    });
-  }
-  return data;
-};
-
-// Generate mock P&L history
-const generatePnLHistory = (days: number = 14) => {
-  const data = [];
-  for (let i = 0; i < days; i++) {
-    const date = new Date();
-    date.setDate(date.getDate() - (days - i));
-
-    data.push({
-      date: date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
-      pnl: Math.round((Math.random() - 0.4) * 1000),
-      trades: Math.floor(Math.random() * 15) + 1,
-    });
-  }
-  return data;
-};
 
 interface RiskGaugeProps {
   label: string;
@@ -159,9 +117,22 @@ export function Risk() {
     },
   });
 
-  // Generate chart data
-  const drawdownHistory = useMemo(() => generateDrawdownHistory(30), []);
-  const pnlHistory = useMemo(() => generatePnLHistory(14), []);
+  // Fetch chart data
+  const { data: drawdownHistory = [] } = useQuery({
+    queryKey: ['drawdownHistory'],
+    queryFn: async () => {
+      const res = await api.getDrawdown();
+      return res.data;
+    },
+  });
+
+  const { data: pnlHistory = [] } = useQuery({
+    queryKey: ['pnlHistory'],
+    queryFn: async () => {
+      const res = await api.getRiskEvents(); // Using risk events or pnl history
+      return res.data;
+    },
+  });
 
   const updateMutation = useMutation({
     mutationFn: (config: Partial<RiskConfig>) => api.updateRiskConfig(config),
@@ -408,8 +379,8 @@ export function Risk() {
                   <AreaChart data={drawdownHistory}>
                     <defs>
                       <linearGradient id="drawdownGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#ef5350" stopOpacity={0.4}/>
-                        <stop offset="95%" stopColor="#ef5350" stopOpacity={0}/>
+                        <stop offset="5%" stopColor="#ef5350" stopOpacity={0.4} />
+                        <stop offset="95%" stopColor="#ef5350" stopOpacity={0} />
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#2a2e39" vertical={false} />

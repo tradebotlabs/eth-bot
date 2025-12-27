@@ -34,17 +34,6 @@ function useIsMobile() {
   return isMobile;
 }
 
-// Generate mock performance data for sparklines
-const generatePerformanceData = (days: number = 30, trend: number = 0) => {
-  const data = [];
-  let value = 100;
-  for (let i = 0; i < days; i++) {
-    value += (Math.random() - 0.45 + trend * 0.1) * 5;
-    data.push({ day: i, value: Math.max(50, value) });
-  }
-  return data;
-};
-
 interface SortableStrategyCardProps {
   strategy: Strategy;
   onToggle: (strategy: Strategy) => void;
@@ -154,8 +143,8 @@ function SortableStrategyCard({ strategy, onToggle, isToggling, performanceData,
                 <AreaChart data={performanceData}>
                   <defs>
                     <linearGradient id={`gradient-${strategy.id}`} x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={sparklineColor} stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor={sparklineColor} stopOpacity={0}/>
+                      <stop offset="5%" stopColor={sparklineColor} stopOpacity={0.3} />
+                      <stop offset="95%" stopColor={sparklineColor} stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <Area
@@ -298,24 +287,6 @@ export function Strategies() {
       return res.data;
     },
   });
-
-  // Initialize order when strategies load
-  useMemo(() => {
-    if (strategies.length > 0 && strategyOrder.length === 0) {
-      setStrategyOrder(strategies.map(s => s.id));
-    }
-  }, [strategies, strategyOrder.length]);
-
-  // Generate performance data for each strategy
-  const performanceDataMap = useMemo(() => {
-    const map: Record<string, { day: number; value: number }[]> = {};
-    strategies.forEach(s => {
-      const perf = s.performance || { totalPnl: 0 };
-      const trend = perf.totalPnl >= 0 ? 0.3 : -0.3;
-      map[s.id] = generatePerformanceData(30, trend);
-    });
-    return map;
-  }, [strategies]);
 
   const sortedStrategies = useMemo(() => {
     if (strategyOrder.length === 0) return strategies;
@@ -467,7 +438,7 @@ export function Strategies() {
                 strategy={strategy}
                 onToggle={toggleStrategy}
                 isToggling={enableMutation.isPending || disableMutation.isPending}
-                performanceData={performanceDataMap[strategy.id] || []}
+                performanceData={[]}
                 isMobile={isMobile}
               />
             ))}

@@ -1,4 +1,6 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import * as api from '../services/api';
 import {
   Line,
   XAxis,
@@ -32,108 +34,63 @@ function useIsMobile() {
   return isMobile;
 }
 
-// Generate mock performance data
-const generateEquityCurve = (days: number = 90) => {
-  const data = [];
-  let equity = 100000;
-  let benchmark = 100000;
-
-  for (let i = 0; i < days; i++) {
-    const date = new Date();
-    date.setDate(date.getDate() - (days - i));
-
-    equity += (Math.random() - 0.45) * 1500;
-    benchmark += (Math.random() - 0.48) * 1000;
-
-    data.push({
-      date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-      equity: Math.round(equity),
-      benchmark: Math.round(benchmark),
-    });
-  }
-  return data;
-};
-
-const generateDailyReturns = (days: number = 30) => {
-  const data = [];
-  for (let i = 0; i < days; i++) {
-    const date = new Date();
-    date.setDate(date.getDate() - (days - i));
-    data.push({
-      date: date.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' }),
-      return: (Math.random() - 0.45) * 4,
-      trades: Math.floor(Math.random() * 12) + 1,
-    });
-  }
-  return data;
-};
-
-const generateHourlyDistribution = () => {
-  const hours = [];
-  for (let i = 0; i < 24; i++) {
-    hours.push({
-      hour: `${i.toString().padStart(2, '0')}:00`,
-      trades: Math.floor(Math.random() * 20),
-      pnl: (Math.random() - 0.4) * 500,
-    });
-  }
-  return hours;
-};
-
-const generateStrategyPerformance = () => [
-  { strategy: 'Trend Following', winRate: 0.62, pnl: 4500, trades: 45, sharpe: 1.8 },
-  { strategy: 'Mean Reversion', winRate: 0.55, pnl: 2200, trades: 68, sharpe: 1.2 },
-  { strategy: 'Breakout', winRate: 0.48, pnl: -800, trades: 32, sharpe: 0.6 },
-  { strategy: 'Scalping', winRate: 0.71, pnl: 1800, trades: 156, sharpe: 2.1 },
-  { strategy: 'Momentum', winRate: 0.58, pnl: 3200, trades: 28, sharpe: 1.5 },
-];
-
-const generateWinLossStreak = () => {
-  const data = [];
-  for (let i = 0; i < 50; i++) {
-    data.push({
-      trade: i + 1,
-      result: Math.random() > 0.4 ? 1 : -1,
-      pnl: (Math.random() - 0.4) * 200,
-    });
-  }
-  return data;
-};
-
-const generateRadarData = () => [
-  { metric: 'Win Rate', value: 62, fullMark: 100 },
-  { metric: 'Profit Factor', value: 75, fullMark: 100 },
-  { metric: 'Sharpe Ratio', value: 68, fullMark: 100 },
-  { metric: 'Risk/Reward', value: 82, fullMark: 100 },
-  { metric: 'Consistency', value: 58, fullMark: 100 },
-  { metric: 'Recovery', value: 71, fullMark: 100 },
-];
-
 export function Analytics() {
   const [timeRange, setTimeRange] = useState<'1W' | '1M' | '3M' | '6M' | 'YTD' | 'ALL'>('3M');
   const isMobile = useIsMobile();
 
-  // Generate chart data
-  const equityCurve = useMemo(() => generateEquityCurve(90), []);
-  const dailyReturns = useMemo(() => generateDailyReturns(30), []);
-  const hourlyDistribution = useMemo(() => generateHourlyDistribution(), []);
-  const strategyPerformance = useMemo(() => generateStrategyPerformance(), []);
-  const winLossStreak = useMemo(() => generateWinLossStreak(), []);
-  const radarData = useMemo(() => generateRadarData(), []);
+  // Fetch real data
+  const { data: performanceData } = useQuery({
+    queryKey: ['performance'],
+    queryFn: async () => {
+      const res = await api.getPerformance();
+      return res.data;
+    },
+  });
+
+  const { data: equityCurveData = [] } = useQuery({
+    queryKey: ['equityCurve', timeRange],
+    queryFn: async () => {
+      const res = await api.getEquityCurve();
+      return res.data;
+    },
+  });
+
+  const { data: strategiesData = [] } = useQuery({
+    queryKey: ['strategies'],
+    queryFn: async () => {
+      const res = await api.getStrategies();
+      return res.data;
+    },
+  });
 
   const formatPrice = (price: number) =>
     new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(price);
 
-  // Calculate summary metrics
-  const totalPnL = strategyPerformance.reduce((sum, s) => sum + s.pnl, 0);
-  const totalTrades = strategyPerformance.reduce((sum, s) => sum + s.trades, 0);
-  const avgWinRate = strategyPerformance.reduce((sum, s) => sum + s.winRate, 0) / strategyPerformance.length;
-  const avgSharpe = strategyPerformance.reduce((sum, s) => sum + s.sharpe, 0) / strategyPerformance.length;
+  // Use real data or empty fallbacks
+  const equityCurve = equityCurveData;
+  const strategies = strategiesData;
 
-  const winningDays = dailyReturns.filter(d => d.return > 0).length;
-  const losingDays = dailyReturns.filter(d => d.return < 0).length;
-  const maxDailyGain = Math.max(...dailyReturns.map(d => d.return));
-  const maxDailyLoss = Math.min(...dailyReturns.map(d => d.return));
+  const totalPnL = performanceData?.totalReturn || 0;
+  const totalTrades = performanceData?.totalTrades || 0;
+  const winRate = performanceData?.winRate || 0;
+  const maxDrawdown = performanceData?.maxDrawdown || 0;
+
+  // Fallback for empty data visuals
+  const radarData = [
+    { metric: 'Win Rate', value: winRate * 100, fullMark: 100 },
+    { metric: 'Max Drawdown', value: (1 - maxDrawdown) * 100, fullMark: 100 },
+    { metric: 'Profit Factor', value: (performanceData?.profitFactor || 0) * 20, fullMark: 100 },
+    { metric: 'Total Trades', value: Math.min(totalTrades, 100), fullMark: 100 },
+  ];
+
+  const dailyReturns: { date: string; return: number; trades: number }[] = [];
+  const hourlyDistribution: { hour: string; trades: number; pnl: number }[] = [];
+  const winLossStreak: { trade: number; pnl: number }[] = [];
+  const winningDays = 0;
+  const losingDays = 0;
+  const maxDailyGain = 0;
+  const maxDailyLoss = 0;
+  const avgSharpe = performanceData?.sharpeRatio || 0;
 
   return (
     <div className="animate-fade-in">
@@ -189,7 +146,7 @@ export function Analytics() {
             {totalPnL >= 0 ? '+' : ''}{formatPrice(totalPnL)}
           </div>
           <div className="stat-change text-muted">
-            {strategyPerformance.filter(s => s.pnl > 0).length}/{strategyPerformance.length} profitable strategies
+            {strategies.filter(s => s.performance.totalPnl > 0).length}/{strategies.length} profitable strategies
           </div>
         </div>
         <div className="stat-card">
@@ -201,9 +158,9 @@ export function Analytics() {
         </div>
         <div className="stat-card">
           <div className="stat-label">Avg Win Rate</div>
-          <div className="stat-value">{(avgWinRate * 100).toFixed(1)}%</div>
+          <div className="stat-value">{(winRate * 100).toFixed(1)}%</div>
           <div className="stat-change text-muted">
-            {winningDays}/{dailyReturns.length} winning days
+            {winningDays}/{dailyReturns.length || performanceData?.totalTrades || 0} winning days
           </div>
         </div>
         <div className="stat-card">
@@ -243,8 +200,8 @@ export function Analytics() {
             <AreaChart data={equityCurve}>
               <defs>
                 <linearGradient id="portfolioGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#2962ff" stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor="#2962ff" stopOpacity={0}/>
+                  <stop offset="5%" stopColor="#2962ff" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#2962ff" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#2a2e39" vertical={false} />
@@ -423,19 +380,19 @@ export function Analytics() {
               </tr>
             </thead>
             <tbody>
-              {strategyPerformance.map((strategy, index) => (
+              {strategies.map((strategy, index) => (
                 <tr key={index} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                  <td style={{ padding: '14px 20px', fontWeight: 500 }}>{strategy.strategy}</td>
-                  <td style={{ padding: '14px 20px', textAlign: 'right' }}>{(strategy.winRate * 100).toFixed(1)}%</td>
+                  <td style={{ padding: '14px 20px', fontWeight: 500 }}>{strategy.name}</td>
+                  <td style={{ padding: '14px 20px', textAlign: 'right' }}>{(strategy.performance.winRate * 100).toFixed(1)}%</td>
                   <td style={{ padding: '14px 20px', textAlign: 'right' }}>
-                    <span className={strategy.pnl >= 0 ? 'profit' : 'loss'} style={{ fontWeight: 600 }}>
-                      {strategy.pnl >= 0 ? '+' : ''}{formatPrice(strategy.pnl)}
+                    <span className={strategy.performance.totalPnl >= 0 ? 'profit' : 'loss'} style={{ fontWeight: 600 }}>
+                      {strategy.performance.totalPnl >= 0 ? '+' : ''}{formatPrice(strategy.performance.totalPnl)}
                     </span>
                   </td>
-                  <td style={{ padding: '14px 20px', textAlign: 'right', color: 'var(--text-secondary)' }}>{strategy.trades}</td>
+                  <td style={{ padding: '14px 20px', textAlign: 'right', color: 'var(--text-secondary)' }}>{strategy.performance.totalTrades}</td>
                   <td style={{ padding: '14px 20px', textAlign: 'right' }}>
-                    <span style={{ color: strategy.sharpe >= 1.5 ? 'var(--accent-green)' : strategy.sharpe >= 1 ? 'var(--text-primary)' : 'var(--accent-red)' }}>
-                      {strategy.sharpe.toFixed(2)}
+                    <span style={{ color: strategy.performance.profitFactor >= 2 ? 'var(--accent-green)' : strategy.performance.profitFactor >= 1 ? 'var(--text-primary)' : 'var(--accent-red)' }}>
+                      {strategy.performance.profitFactor.toFixed(2)}
                     </span>
                   </td>
                   <td style={{ padding: '14px 20px', textAlign: 'right' }}>
@@ -453,9 +410,9 @@ export function Analytics() {
                         overflow: 'hidden',
                       }}>
                         <div style={{
-                          width: `${strategy.winRate * 100}%`,
+                          width: `${strategy.performance.winRate * 100}%`,
                           height: '100%',
-                          background: strategy.pnl >= 0 ? 'var(--accent-green)' : 'var(--accent-red)',
+                          background: strategy.performance.totalPnl >= 0 ? 'var(--accent-green)' : 'var(--accent-red)',
                           borderRadius: '3px',
                         }} />
                       </div>
