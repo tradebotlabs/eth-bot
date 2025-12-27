@@ -1,5 +1,6 @@
-import { Link, useLocation, Outlet } from 'react-router-dom';
+import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import { useTradingStore } from '../stores/tradingStore';
+import { useAuthStore } from '../stores/authStore';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { useState, useEffect } from 'react';
 import * as api from '../services/api';
@@ -46,6 +47,7 @@ const navItems = [
 
 export function Layout() {
   const location = useLocation();
+  const navigate = useNavigate();
   useWebSocket();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -53,6 +55,16 @@ export function Layout() {
   const [isToggling, setIsToggling] = useState(false);
 
   const { wsConnected, isRunning, mode, currentPrice, accountStats, setStatus } = useTradingStore();
+  const { user, logout } = useAuthStore();
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/login');
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
+  };
 
   // Check for mobile viewport
   useEffect(() => {
@@ -203,30 +215,120 @@ export function Layout() {
         ))}
       </nav>
 
-      {/* Status */}
+      {/* User & Status */}
       <div style={{
-        padding: '12px',
         borderTop: '1px solid #2a2e39',
-        fontSize: '11px',
       }}>
+        {/* User Info */}
+        {expanded && user && (
+          <div style={{
+            padding: '12px',
+            borderBottom: '1px solid #2a2e39',
+          }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              marginBottom: '8px',
+            }}>
+              <div style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white',
+                fontSize: '13px',
+                fontWeight: 600,
+                flexShrink: 0,
+              }}>
+                {user.full_name.charAt(0).toUpperCase()}
+              </div>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{
+                  color: '#d1d4dc',
+                  fontSize: '12px',
+                  fontWeight: 500,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}>
+                  {user.full_name}
+                </div>
+                <div style={{
+                  color: '#787b86',
+                  fontSize: '10px',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}>
+                  {user.email}
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={handleLogout}
+              style={{
+                width: '100%',
+                padding: '6px 8px',
+                fontSize: '11px',
+                fontWeight: 500,
+                color: '#787b86',
+                background: 'transparent',
+                border: '1px solid #2a2e39',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                transition: 'all 0.1s ease',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = '#2a2e39';
+                e.currentTarget.style.color = '#d1d4dc';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent';
+                e.currentTarget.style.color = '#787b86';
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <polyline points="16 17 21 12 16 7" />
+                <line x1="21" y1="12" x2="9" y2="12" />
+              </svg>
+              Logout
+            </button>
+          </div>
+        )}
+
+        {/* Connection Status */}
         <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: expanded ? 'flex-start' : 'center',
-          gap: '6px',
+          padding: '12px',
+          fontSize: '11px',
         }}>
           <div style={{
-            width: '8px',
-            height: '8px',
-            borderRadius: '50%',
-            background: wsConnected ? '#26a69a' : '#ef5350',
-            boxShadow: wsConnected ? '0 0 6px #26a69a' : '0 0 6px #ef5350',
-          }} />
-          {expanded && (
-            <span style={{ color: '#787b86', fontSize: '11px' }}>
-              {wsConnected ? 'Connected' : 'Offline'}
-            </span>
-          )}
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: expanded ? 'flex-start' : 'center',
+            gap: '6px',
+          }}>
+            <div style={{
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              background: wsConnected ? '#26a69a' : '#ef5350',
+              boxShadow: wsConnected ? '0 0 6px #26a69a' : '0 0 6px #ef5350',
+            }} />
+            {expanded && (
+              <span style={{ color: '#787b86', fontSize: '11px' }}>
+                {wsConnected ? 'Connected' : 'Offline'}
+              </span>
+            )}
+          </div>
         </div>
       </div>
     </>

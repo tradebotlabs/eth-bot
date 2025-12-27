@@ -8,12 +8,22 @@ import type {
   Strategy,
   RiskConfig,
 } from '../types';
+import { useAuthStore } from '../stores/authStore';
 
 const api = axios.create({
-  baseURL: '/api/v1',
+  baseURL: 'http://localhost:8080/api/v1',
   headers: {
     'Content-Type': 'application/json',
   },
+});
+
+// Add auth token to all requests
+api.interceptors.request.use((config) => {
+  const token = useAuthStore.getState().accessToken;
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
 });
 
 // Dashboard

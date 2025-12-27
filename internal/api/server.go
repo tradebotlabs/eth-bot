@@ -8,6 +8,7 @@ import (
 	"github.com/eth-trading/internal/api/handlers"
 	"github.com/eth-trading/internal/api/middleware"
 	"github.com/eth-trading/internal/api/websocket"
+	"github.com/eth-trading/internal/auth"
 	"github.com/eth-trading/internal/orchestrator"
 	"github.com/labstack/echo/v4"
 	echoMiddleware "github.com/labstack/echo/v4/middleware"
@@ -41,11 +42,12 @@ type Server struct {
 	config       *ServerConfig
 	echo         *echo.Echo
 	orchestrator *orchestrator.Orchestrator
+	authService  *auth.Service
 	wsHub        *websocket.Hub
 }
 
 // NewServer creates a new API server
-func NewServer(config *ServerConfig, orch *orchestrator.Orchestrator) *Server {
+func NewServer(config *ServerConfig, orch *orchestrator.Orchestrator, authService *auth.Service) *Server {
 	if config == nil {
 		config = DefaultServerConfig()
 	}
@@ -58,6 +60,7 @@ func NewServer(config *ServerConfig, orch *orchestrator.Orchestrator) *Server {
 		config:       config,
 		echo:         e,
 		orchestrator: orch,
+		authService:  authService,
 		wsHub:        websocket.NewHub(),
 	}
 
@@ -91,7 +94,11 @@ func (s *Server) setupMiddleware() {
 
 // setupRoutes configures API routes
 func (s *Server) setupRoutes() {
+	// Create auth middleware
+	authMiddleware := middleware.NewAuthMiddleware(s.authService)
+
 	// Create handlers
+	authHandler := handlers.NewAuthHandler(s.authService)
 	dashboardHandler := handlers.NewDashboardHandler(s.orchestrator)
 	tradingHandler := handlers.NewTradingHandler(s.orchestrator)
 	strategyHandler := handlers.NewStrategyHandler(s.orchestrator)
@@ -101,7 +108,7 @@ func (s *Server) setupRoutes() {
 	orderHandler := handlers.NewOrderHandler(s.orchestrator)
 	candleHandler := handlers.NewCandleHandler(s.orchestrator)
 
-	// Health check
+	// Health check (public)
 	s.echo.GET("/health", func(c echo.Context) error {
 		return c.JSON(http.StatusOK, map[string]string{"status": "healthy"})
 	})
@@ -109,77 +116,94 @@ func (s *Server) setupRoutes() {
 	// API v1 group
 	v1 := s.echo.Group("/api/v1")
 
+	// Auth routes (public - no authentication required)
+	authGroup := v1.Group("/auth")
+	authGroup.POST("/register", authHandler.Register)
+	authGroup.POST("/login", authHandler.Login)
+	authGroup.POST("/refresh", authHandler.RefreshToken)
+	authGroup.POST("/password-reset", authHandler.RequestPasswordReset)
+	authGroup.POST("/password-reset/confirm", authHandler.ConfirmPasswordReset)
+
+	// Protected auth routes (require authentication)
+	authProtected := authGroup.Group("", authMiddleware.Authenticate)
+	authProtected.POST("/logout", authHandler.Logout)
+	authProtected.GET("/me", authHandler.GetMe)
+	authProtected.POST("/change-password", authHandler.ChangePassword)
+
+	// Protected routes (require authentication)
+	protected := v1.Group("", authMiddleware.Authenticate)
+
 	// Dashboard routes
-	v1.GET("/dashboard", dashboardHandler.GetDashboard)
-	v1.GET("/dashboard/summary", dashboardHandler.GetSummary)
-	v1.GET("/dashboard/equity-curve", dashboardHandler.GetEquityCurve)
-	v1.GET("/dashboard/performance", dashboardHandler.GetPerformance)
+	protected.GET("/dashboard", dashboardHandler.GetDashboard)
+	protected.GET("/dashboard/summary", dashboardHandler.GetSummary)
+	protected.GET("/dashboard/equity-curve", dashboardHandler.GetEquityCurve)
+	protected.GET("/dashboard/performance", dashboardHandler.GetPerformance)
 
 	// Trading routes
-	v1.GET("/trading/state", tradingHandler.GetState)
-	v1.POST("/trading/start", tradingHandler.Start)
-	v1.POST("/trading/stop", tradingHandler.Stop)
-	v1.POST("/trading/pause", tradingHandler.Pause)
-	v1.POST("/trading/resume", tradingHandler.Resume)
-	v1.GET("/trading/mode", tradingHandler.GetMode)
-	v1.POST("/trading/mode", tradingHandler.SetMode)
+	protected.GET("/trading/state", tradingHandler.GetState)
+	protected.POST("/trading/start", tradingHandler.Start)
+	protected.POST("/trading/stop", tradingHandler.Stop)
+	protected.POST("/trading/pause", tradingHandler.Pause)
+	protected.POST("/trading/resume", tradingHandler.Resume)
+	protected.GET("/trading/mode", tradingHandler.GetMode)
+	protected.POST("/trading/mode", tradingHandler.SetMode)
 
 	// Strategy routes
-	v1.GET("/strategies", strategyHandler.GetStrategies)
-	v1.GET("/strategies/:name", strategyHandler.GetStrategy)
-	v1.PUT("/strategies/:name", strategyHandler.UpdateStrategy)
-	v1.POST("/strategies/:name/enable", strategyHandler.EnableStrategy)
-	v1.POST("/strategies/:name/disable", strategyHandler.DisableStrategy)
-	v1.GET("/strategies/:name/signals", strategyHandler.GetSignals)
-	v1.GET("/regime", strategyHandler.GetRegime)
+	protected.GET("/strategies", strategyHandler.GetStrategies)
+	protected.GET("/strategies/:name", strategyHandler.GetStrategy)
+	protected.PUT("/strategies/:name", strategyHandler.UpdateStrategy)
+	protected.POST("/strategies/:name/enable", strategyHandler.EnableStrategy)
+	protected.POST("/strategies/:name/disable", strategyHandler.DisableStrategy)
+	protected.GET("/strategies/:name/signals", strategyHandler.GetSignals)
+	protected.GET("/regime", strategyHandler.GetRegime)
 
 	// Risk routes
-	v1.GET("/risk", riskHandler.GetRiskStatus)
-	v1.GET("/risk/config", riskHandler.GetConfig)
-	v1.PUT("/risk/config", riskHandler.UpdateConfig)
-	v1.GET("/risk/limits", riskHandler.GetLimits)
-	v1.GET("/risk/drawdown", riskHandler.GetDrawdown)
-	v1.GET("/risk/events", riskHandler.GetEvents)
-	v1.POST("/risk/circuit-breaker/reset", riskHandler.ResetCircuitBreaker)
+	protected.GET("/risk", riskHandler.GetRiskStatus)
+	protected.GET("/risk/config", riskHandler.GetConfig)
+	protected.PUT("/risk/config", riskHandler.UpdateConfig)
+	protected.GET("/risk/limits", riskHandler.GetLimits)
+	protected.GET("/risk/drawdown", riskHandler.GetDrawdown)
+	protected.GET("/risk/events", riskHandler.GetEvents)
+	protected.POST("/risk/circuit-breaker/reset", riskHandler.ResetCircuitBreaker)
 
 	// Position routes
-	v1.GET("/positions", positionHandler.GetPositions)
-	v1.GET("/positions/:id", positionHandler.GetPosition)
-	v1.POST("/positions/:id/close", positionHandler.ClosePosition)
-	v1.PUT("/positions/:id/stop-loss", positionHandler.UpdateStopLoss)
-	v1.PUT("/positions/:id/take-profit", positionHandler.UpdateTakeProfit)
+	protected.GET("/positions", positionHandler.GetPositions)
+	protected.GET("/positions/:id", positionHandler.GetPosition)
+	protected.POST("/positions/:id/close", positionHandler.ClosePosition)
+	protected.PUT("/positions/:id/stop-loss", positionHandler.UpdateStopLoss)
+	protected.PUT("/positions/:id/take-profit", positionHandler.UpdateTakeProfit)
 
 	// Order routes
-	v1.GET("/orders", orderHandler.GetOrders)
-	v1.GET("/orders/open", orderHandler.GetOpenOrders)
-	v1.POST("/orders", orderHandler.PlaceOrder)
-	v1.DELETE("/orders/:id", orderHandler.CancelOrder)
+	protected.GET("/orders", orderHandler.GetOrders)
+	protected.GET("/orders/open", orderHandler.GetOpenOrders)
+	protected.POST("/orders", orderHandler.PlaceOrder)
+	protected.DELETE("/orders/:id", orderHandler.CancelOrder)
 
-	// Candle/Market Data routes
+	// Candle/Market Data routes (public - no auth needed for market data)
 	v1.GET("/candles", candleHandler.GetCandles)
 	v1.GET("/candles/:symbol/:timeframe", candleHandler.GetCandlesBySymbol)
 	v1.GET("/ticker", candleHandler.GetTicker)
 	v1.GET("/indicators", candleHandler.GetIndicators)
 
 	// Backtest routes
-	v1.POST("/backtest", backtestHandler.RunBacktest)
-	v1.GET("/backtest/results", backtestHandler.GetResults)
-	v1.GET("/backtest/results/:id", backtestHandler.GetResult)
+	protected.POST("/backtest", backtestHandler.RunBacktest)
+	protected.GET("/backtest/results", backtestHandler.GetResults)
+	protected.GET("/backtest/results/:id", backtestHandler.GetResult)
 
 	// Settings routes - for UI configuration
 	settingsHandler := handlers.NewSettingsHandler(s.orchestrator)
-	v1.GET("/settings", settingsHandler.GetSettings)
-	v1.POST("/settings/reset", settingsHandler.ResetSettings)
-	v1.GET("/settings/trading", settingsHandler.GetTradingSettings)
-	v1.PUT("/settings/trading", settingsHandler.UpdateTradingSettings)
-	v1.GET("/settings/binance", settingsHandler.GetBinanceSettings)
-	v1.PUT("/settings/binance", settingsHandler.UpdateBinanceSettings)
-	v1.GET("/settings/risk", settingsHandler.GetRiskSettings)
-	v1.PUT("/settings/risk", settingsHandler.UpdateRiskSettings)
-	v1.GET("/settings/indicators", settingsHandler.GetIndicatorSettings)
-	v1.PUT("/settings/indicators", settingsHandler.UpdateIndicatorSettings)
-	v1.GET("/settings/strategies", settingsHandler.GetStrategySettings)
-	v1.PUT("/settings/strategies", settingsHandler.UpdateStrategySettings)
+	protected.GET("/settings", settingsHandler.GetSettings)
+	protected.POST("/settings/reset", settingsHandler.ResetSettings)
+	protected.GET("/settings/trading", settingsHandler.GetTradingSettings)
+	protected.PUT("/settings/trading", settingsHandler.UpdateTradingSettings)
+	protected.GET("/settings/binance", settingsHandler.GetBinanceSettings)
+	protected.PUT("/settings/binance", settingsHandler.UpdateBinanceSettings)
+	protected.GET("/settings/risk", settingsHandler.GetRiskSettings)
+	protected.PUT("/settings/risk", settingsHandler.UpdateRiskSettings)
+	protected.GET("/settings/indicators", settingsHandler.GetIndicatorSettings)
+	protected.PUT("/settings/indicators", settingsHandler.UpdateIndicatorSettings)
+	protected.GET("/settings/strategies", settingsHandler.GetStrategySettings)
+	protected.PUT("/settings/strategies", settingsHandler.UpdateStrategySettings)
 
 	// WebSocket
 	s.echo.GET("/ws", s.handleWebSocket)

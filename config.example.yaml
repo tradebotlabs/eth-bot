@@ -1,0 +1,97 @@
+# ETH Trading Bot Configuration
+# Copy this file to config.yaml and update with your settings
+
+# PostgreSQL Database (required for authentication)
+postgres:
+  host: "localhost"
+  port: 5432
+  user: "postgres"
+  password: "postgres"
+  dbname: "eth_trading"
+  sslmode: "disable"  # Use "require" in production
+  maxConns: 25
+  maxIdle: 5
+  connMaxLifetime: 5m
+
+# Authentication Settings
+auth:
+  jwtSecret: "CHANGE_ME_TO_A_SECURE_RANDOM_STRING_IN_PRODUCTION"  # Generate with: openssl rand -base64 32
+  tokenExpiry: 15m        # Access token expiry (15 minutes)
+  refreshTokenExpiry: 168h  # Refresh token expiry (7 days)
+
+# Trading Configuration
+trading:
+  mode: "paper"  # "paper" or "live"
+  symbol: "ETHUSDT"
+  timeframes:
+    - "1m"
+    - "5m"
+    - "15m"
+    - "1h"
+    - "4h"
+    - "1d"
+  primaryTimeframe: "1m"  # Primary timeframe for signal generation
+  initialBalance: 100000.0  # Initial balance for paper trading
+  commission: 0.001  # Commission rate (0.1%)
+  slippage: 0.0005  # Slippage rate (0.05%)
+
+# Binance API Configuration (for live trading)
+binance:
+  apiKey: ""  # Your Binance API key (leave empty for paper trading)
+  secretKey: ""  # Your Binance secret key (leave empty for paper trading)
+  testnet: false  # Use Binance testnet for testing
+
+# Risk Management
+risk:
+  maxPositionSize: 0.10  # Max position as % of equity (10%)
+  maxRiskPerTrade: 0.02  # Max risk per trade (2%)
+  maxDailyLoss: 0.05  # Max daily loss (5%)
+  maxWeeklyLoss: 0.10  # Max weekly loss (10%)
+  maxDrawdown: 0.20  # Max total drawdown (20%)
+  maxOpenPositions: 5  # Max concurrent positions
+  maxLeverage: 1.0  # Max leverage (1.0 = no leverage)
+  minRiskRewardRatio: 1.5  # Minimum risk/reward ratio
+  enableCircuitBreaker: true
+  consecutiveLossLimit: 5  # Halt after N consecutive losses
+  haltDurationHours: 24  # Circuit breaker halt duration
+
+# Technical Indicators
+indicators:
+  rsiPeriod: 14
+  rsiOversold: 30.0
+  rsiOverbought: 70.0
+  macdFast: 12
+  macdSlow: 26
+  macdSignal: 9
+  bbPeriod: 20
+  bbStdDev: 2.0
+  adxPeriod: 14
+  adxThreshold: 25.0
+  atrPeriod: 14
+  atrMultiplierSL: 2.0
+  atrMultiplierTP: 3.0
+
+# Trading Strategies
+strategies:
+  enabled:
+    - "TrendFollowing"
+    - "MeanReversion"
+    - "Breakout"
+    - "Volatility"
+    - "StatArb"
+
+# Legacy SQLite Database (for trading data - will migrate to PostgreSQL)
+database:
+  path: "data/trading.db"
+
+# Data Service
+dataService:
+  circularQueueSize: 1000
+  cacheExpiry: 5m
+
+# API Server
+api:
+  port: ":8080"
+  corsOrigins:
+    - "http://localhost:3000"  # Frontend dev server
+    - "http://localhost:5173"  # Vite dev server

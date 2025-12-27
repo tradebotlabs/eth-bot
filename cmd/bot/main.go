@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/eth-trading/internal/api"
+	"github.com/eth-trading/internal/auth"
 	"github.com/eth-trading/internal/binance"
 	"github.com/eth-trading/internal/config"
 	"github.com/eth-trading/internal/execution"
@@ -34,7 +35,52 @@ func main() {
 		cfg = config.DefaultConfig()
 	}
 
-	// Initialize SQLite database
+	// Initialize PostgreSQL database for user/auth data
+	pgCfg := &storage.PostgresConfig{
+		Host:            cfg.Postgres.Host,
+		Port:            cfg.Postgres.Port,
+		User:            cfg.Postgres.User,
+		Password:        cfg.Postgres.Password,
+		DBName:          cfg.Postgres.DBName,
+		SSLMode:         cfg.Postgres.SSLMode,
+		MaxConns:        cfg.Postgres.MaxConns,
+		MaxIdle:         cfg.Postgres.MaxIdle,
+		ConnMaxLifetime: cfg.Postgres.ConnMaxLifetime,
+	}
+
+	pgDB, err := storage.NewPostgresDB(pgCfg)
+	if err != nil {
+		log.Warn().Err(err).Msg("Failed to connect to PostgreSQL, authentication will not be available")
+		pgDB = nil
+	}
+	if pgDB != nil {
+		defer pgDB.Close()
+	}
+
+	// Initialize repositories
+	var userRepo *storage.UserRepository
+	var sessionRepo *storage.SessionRepository
+	var tradingAccountRepo *storage.TradingAccountRepository
+	var authService *auth.Service
+
+	if pgDB != nil {
+		userRepo = storage.NewUserRepository(pgDB)
+		sessionRepo = storage.NewSessionRepository(pgDB)
+		tradingAccountRepo = storage.NewTradingAccountRepository(pgDB)
+
+		// Initialize auth service
+		authCfg := &auth.Config{
+			JWTSecret:          cfg.Auth.JWTSecret,
+			TokenExpiry:        cfg.Auth.TokenExpiry,
+			RefreshTokenExpiry: cfg.Auth.RefreshTokenExpiry,
+		}
+		authService = auth.NewService(authCfg, userRepo, sessionRepo, tradingAccountRepo)
+		log.Info().Msg("Authentication service initialized")
+	} else {
+		log.Warn().Msg("Running without authentication - PostgreSQL not available")
+	}
+
+	// Initialize SQLite database for trading data (will migrate to PostgreSQL later)
 	db, err := storage.NewSQLiteDB(cfg.Database.Path)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to initialize database")
@@ -173,7 +219,7 @@ func main() {
 		WriteTimeout: 30 * time.Second,
 		CORSOrigins:  cfg.API.CORSOrigins,
 	}
-	server := api.NewServer(apiCfg, orch)
+	server := api.NewServer(apiCfg, orch, authService)
 
 	// Start orchestrator
 	if err := orch.Start(); err != nil {

@@ -15,6 +15,8 @@ type Config struct {
 	Indicators  IndicatorConfig   `yaml:"indicators"`
 	Strategies  StrategiesConfig  `yaml:"strategies"`
 	Database    DatabaseConfig    `yaml:"database"`
+	Postgres    PostgresConfig    `yaml:"postgres"`
+	Auth        AuthConfig        `yaml:"auth"`
 	DataService DataServiceConfig `yaml:"dataService"`
 	API         APIConfig         `yaml:"api"`
 }
@@ -74,9 +76,29 @@ type StrategiesConfig struct {
 	Enabled []string `yaml:"enabled"` // List of enabled strategy names
 }
 
-// DatabaseConfig represents database configuration
+// DatabaseConfig represents database configuration (SQLite - deprecated, use Postgres)
 type DatabaseConfig struct {
 	Path string `yaml:"path"`
+}
+
+// PostgresConfig represents PostgreSQL configuration
+type PostgresConfig struct {
+	Host            string        `yaml:"host"`
+	Port            int           `yaml:"port"`
+	User            string        `yaml:"user"`
+	Password        string        `yaml:"password"`
+	DBName          string        `yaml:"dbname"`
+	SSLMode         string        `yaml:"sslmode"`
+	MaxConns        int           `yaml:"maxConns"`
+	MaxIdle         int           `yaml:"maxIdle"`
+	ConnMaxLifetime time.Duration `yaml:"connMaxLifetime"`
+}
+
+// AuthConfig represents authentication configuration
+type AuthConfig struct {
+	JWTSecret          string        `yaml:"jwtSecret"`
+	TokenExpiry        time.Duration `yaml:"tokenExpiry"`
+	RefreshTokenExpiry time.Duration `yaml:"refreshTokenExpiry"`
 }
 
 // DataServiceConfig represents data service configuration
@@ -228,9 +250,49 @@ func applyDefaults(cfg *Config) {
 		}
 	}
 
-	// Database defaults
+	// Database defaults (SQLite - deprecated)
 	if cfg.Database.Path == "" {
 		cfg.Database.Path = "data/trading.db"
+	}
+
+	// PostgreSQL defaults
+	if cfg.Postgres.Host == "" {
+		cfg.Postgres.Host = "localhost"
+	}
+	if cfg.Postgres.Port == 0 {
+		cfg.Postgres.Port = 5432
+	}
+	if cfg.Postgres.User == "" {
+		cfg.Postgres.User = "postgres"
+	}
+	if cfg.Postgres.Password == "" {
+		cfg.Postgres.Password = "postgres"
+	}
+	if cfg.Postgres.DBName == "" {
+		cfg.Postgres.DBName = "eth_trading"
+	}
+	if cfg.Postgres.SSLMode == "" {
+		cfg.Postgres.SSLMode = "disable"
+	}
+	if cfg.Postgres.MaxConns == 0 {
+		cfg.Postgres.MaxConns = 25
+	}
+	if cfg.Postgres.MaxIdle == 0 {
+		cfg.Postgres.MaxIdle = 5
+	}
+	if cfg.Postgres.ConnMaxLifetime == 0 {
+		cfg.Postgres.ConnMaxLifetime = 5 * time.Minute
+	}
+
+	// Auth defaults
+	if cfg.Auth.JWTSecret == "" {
+		cfg.Auth.JWTSecret = "change-me-in-production-to-a-secure-random-string"
+	}
+	if cfg.Auth.TokenExpiry == 0 {
+		cfg.Auth.TokenExpiry = 15 * time.Minute
+	}
+	if cfg.Auth.RefreshTokenExpiry == 0 {
+		cfg.Auth.RefreshTokenExpiry = 7 * 24 * time.Hour
 	}
 
 	// DataService defaults

@@ -1,0 +1,140 @@
+name: Bug Report
+description: Report a bug or unexpected behavior
+title: "[Bug]: "
+labels: ["bug", "triage"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug! Please fill out the following information to help us resolve the issue.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of what the bug is.
+      placeholder: Tell us what happened
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: How can we reproduce this bug? Please be as specific as possible.
+      placeholder: |
+        1. Go to '...'
+        2. Click on '....'
+        3. Scroll down to '....'
+        4. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen?
+      placeholder: Describe what you expected
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What actually happened?
+      placeholder: Describe what actually happened
+    validations:
+      required: true
+
+  - type: dropdown
+    id: trading-mode
+    attributes:
+      label: Trading Mode
+      description: Were you using paper trading or live trading?
+      options:
+        - Paper Trading
+        - Live Trading
+        - Both
+        - Not applicable
+    validations:
+      required: true
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Affected Component
+      description: Which part of the application is affected?
+      options:
+        - Authentication/Login
+        - Dashboard/UI
+        - Trading Engine
+        - Strategy Execution
+        - Risk Management
+        - Charts/Visualization
+        - Database
+        - API/Backend
+        - WebSocket
+        - Configuration
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant Logs
+      description: Please paste any relevant logs or error messages (be sure to remove any sensitive information like API keys!)
+      render: shell
+      placeholder: |
+        Paste logs here (remove API keys and sensitive data)
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Tell us about your environment
+      value: |
+        - OS: [e.g., macOS 14, Ubuntu 22.04, Windows 11]
+        - Go Version: [e.g., 1.22.0]
+        - Node Version: [e.g., 20.10.0]
+        - Browser: [e.g., Chrome 120, Safari 17]
+        - ETH Trading Bot Version: [e.g., 1.0.0]
+        - Database: [e.g., PostgreSQL 16.1]
+    validations:
+      required: true
+
+  - type: textarea
+    id: config
+    attributes:
+      label: Configuration
+      description: Share relevant parts of your config.yaml (remove API keys!)
+      render: yaml
+      placeholder: |
+        trading:
+          mode: "paper"
+          symbol: "ETHUSDT"
+        # ... other relevant config
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Add any other context about the problem here (screenshots, etc.)
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-submission Checklist
+      options:
+        - label: I have searched existing issues to make sure this isn't a duplicate
+          required: true
+        - label: I have removed all sensitive information (API keys, passwords, etc.)
+          required: true
+        - label: I am using the latest version of ETH Trading Bot
+          required: false
+        - label: I have tested this in paper trading mode
+          required: false
